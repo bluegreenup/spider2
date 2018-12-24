@@ -10,3 +10,6 @@
 3. sina
    > 原理：使用selenium模拟登陆，人工输入用户名密码，从微薄相册-相册专辑-xx专辑-xx相册-当前照片的网页源代码中获取`owner_uid album_id album_photo_ids`，拼接出待爬取的地址，爬取获得具体图片的地址，改用迅雷下载orz   
    > 相关文件：`sina_login.py sina_pic.py`
+3. alisaverner
+   > 原理：使用requests，采用多线程下载主页的所有图片
+   > 相关文件：`alisaverner.py`

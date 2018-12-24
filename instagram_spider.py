@@ -63,7 +63,7 @@ def spider_mutile_cpu(preylist, next_curosr_num, copy_new = True):
 
 def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
     spider = ipProxySpider()
-    html = spider.getHtml(prey.page, timeout=10, retries=2, proxy=True)
+    html = spider.getHtml(prey.page, timeout=10, retries=2, proxy=False)
     # self.batch_fetch_web()
     if html:
         # print html.content
@@ -89,7 +89,7 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
             detail_html_list.append("https://www.instagram.com/p/" + shortcode + '/?taken-by=' + blogger)
         # print detail_html_list
         for detail_html in detail_html_list:
-            detail_html_content = spider.getHtml(detail_html, timeout=10, retries=2, proxy=True)
+            detail_html_content = spider.getHtml(detail_html, timeout=10, retries=2, proxy=False)
             # print detail_html_content.content
             if detail_html_content:
                 if 'video_url' in detail_html_content.content:
@@ -98,7 +98,7 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
                     INSTAGRAM_LOGGER.info(blogger + ' \'s ' + ' '.join(videos))
                     if videos:
                         
-                        save_ideo(video_path, videos, copy_new)
+                        save_video(video_path, videos, copy_new)
                     else:
                         INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s video on ' + detail_html)
 
@@ -167,7 +167,7 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
                                 # if copy_new == 1:
                                 #     newpath = "video" + os.path.sep + "new" + os.path.sep + dir
                                 #     self.mkdir(newpath)
-                                save_ideo(video_path, videos, copy_new)
+                                save_video(video_path, videos, copy_new)
                             else:
                                 # print 'Fail to get ' + blogger + ' \'s video on ' + detail_html
                                 INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s video on ' + detail_html)
@@ -233,7 +233,7 @@ def save_img(path, result, copy_new=True):
                 pass
             else:
                 # print img_file_name
-                img = spider.getHtml(item, timeout=10, retries=2, proxy=True)
+                img = spider.getHtml(item, timeout=10, retries=2, proxy=False)
                 if img:
                     f = open(img_file_name, 'ab')
                     f.write(img.content)
@@ -259,7 +259,7 @@ def save_img(path, result, copy_new=True):
 
 
 
-def save_ideo(path, videos, copy_new=0):
+def save_video(path, videos, copy_new=0):
     spider = ipProxySpider()
     if videos:
         total = 0
@@ -277,7 +277,7 @@ def save_ideo(path, videos, copy_new=0):
             else:
                 # print video_file_name
 
-                video = spider.getHtml(item, timeout=10, retries=2, proxy=True)
+                video = spider.getHtml(item, timeout=10, retries=2, proxy=False)
                 if video:
                     with open(video_file_name, 'wb') as f:
                         f.write(video.content)
