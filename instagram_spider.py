@@ -482,7 +482,7 @@ class SpiderPrey(object):
 if __name__ == "__main__":
     # prey_list = []
     # prey = SpiderPrey()
-    # page = "https://www.instagram.com/haileyoutland"#hannahbjeter
+    # page = "https://www.instagram.com/joca"#hannahbjeter
     # reg = "\"display_[a-z]+\": *\"([^\"]+?)\", *\""
     # prey.catalogue = "null"
     # prey.catalogue_reg = "null"
