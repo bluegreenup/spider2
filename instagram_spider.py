@@ -7,6 +7,8 @@ import sys
 from logging.handlers import RotatingFileHandler
 from ipProxySpider import ipProxySpider
 import concurrent.futures
+import random
+import time
 
 logging.basicConfig(level=logging.INFO,
                     format='[%(levelname)s] %(asctime)s %(filename)s[line:%(lineno)d] %(message)s',
@@ -23,6 +25,8 @@ INSTAGRAM_ROTATING_FILE_HANDLER.setLevel(logging.DEBUG)
 INSTAGRAM_ROTATING_FILE_HANDLER.setFormatter(logging.Formatter(
     '[%(levelname)s] %(asctime)s %(filename)s[line:%(lineno)d] %(message)s'))
 INSTAGRAM_LOGGER.addHandler(INSTAGRAM_ROTATING_FILE_HANDLER)
+
+QUERY_HASH_LIST = ['e7e2f4da4b02303f74f0841279e52d76', 'c9100bf9110dd6361671f113dd02e7d6', '2c5d4d8b70cad329c4a6ebe3abb6eedd']
 
 def get_prey_list():
     file = "./conf/instagram.xml"
@@ -55,24 +59,30 @@ def get_prey_list():
         preylist.append(prey)
     return preylist
 
-def spider_mutile_cpu(preylist, next_curosr_num, copy_new = True):
+def spider_mutile_cpu(preylist, next_curosr_num, copy_new):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         for prey in preylist:
             executor.submit(spider_one_instagram_blogger, prey, next_curosr_num, copy_new)
 
+def use_mutile_cpu(preylist, func):
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for prey in preylist:
+            executor.submit(func, prey)
 
-def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
+
+def spider_one_instagram_blogger(prey, next_curosr_num, copy_new=True):
     spider = ipProxySpider()
+    blogger = prey.page.split('/')[-1]
     html = spider.getHtml(prey.page, timeout=10, retries=2, proxy=False)
     # self.batch_fetch_web()
     if html:
+        INSTAGRAM_LOGGER.info(blogger + ': main page ' + prey.page)
         # print html.content
         # re.S匹配换行符 可以多行匹配
         # 先抓取shortcode，来拼接详情页面的网址 www.instagram.com/p/shortcode/?taken-by=xxx
         short_code_list = re.findall('\"shortcode\": ?\"([^\"]+?)\", ?\"', html.content, re.S)
         # print short_code_list
         detail_html_list = []
-        blogger = prey.page.split('/')[-1]
 
         dir = blogger
         video_path = "video" + os.path.sep + dir
@@ -92,52 +102,246 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
             detail_html_content = spider.getHtml(detail_html, timeout=10, retries=2, proxy=False)
             # print detail_html_content.content
             if detail_html_content:
+                INSTAGRAM_LOGGER.info(blogger + ': detail page ' + detail_html)
                 if 'video_url' in detail_html_content.content:
                     videos = re.findall('\"video_url+\": ?\"([^\"]+?)\", ?\"',
                                         detail_html_content.content, re.S)
-                    INSTAGRAM_LOGGER.info(blogger + ' \'s ' + ' '.join(videos))
+                    # remove_tag(videos)
+                    INSTAGRAM_LOGGER.info(blogger + ': video(s) ' + ' '.join(videos))
                     if videos:
-                        
+                        videos = unicode_escape(videos)
                         save_video(video_path, videos, copy_new)
                     else:
-                        INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s video on ' + detail_html)
+                        INSTAGRAM_LOGGER.warn(blogger + ': Fail to get video(s) on ' + detail_html)
 
                 img_list = re.findall(prey.page_reg, detail_html_content.content, re.S)
+                # remove_tag(img_list)
                 if img_list:
+                    img_list = unicode_escape(img_list)
                     # 只有一个的，就抓那一个；两个以上的，从第二个开始抓取，去掉重复的
                     if len(img_list) > 1:
                         img_list = img_list[1:]
-                    INSTAGRAM_LOGGER.info(blogger + ' \'s ' + ' '.join(img_list))
+                    INSTAGRAM_LOGGER.info(blogger + ': images ' + ' '.join(img_list))
 
                     save_img(img_path, img_list, copy_new)
                 else:
                     
-                    INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s images on ' + detail_html)
+                    INSTAGRAM_LOGGER.warn(blogger + ': Fail to get image(s) on ' + detail_html)
             else:
                 
-                INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s detail web:' + detail_html)
+                INSTAGRAM_LOGGER.warn(blogger + ': Fail to get detail web ' + detail_html)
 
-        id = re.findall("\"id\": ?\"(\d+)\",.+?\"is_private", html.content, re.S)[0]
+        id = re.findall("\"id\": ?\"(\d+)\", ?\"username", html.content, re.S)[0]
         # print id
-        query_id = 17862015703145017
-        query_hash = 'e7e2f4da4b02303f74f0841279e52d76'
+        #query_id = 17862015703145017
+        query_hash = ''
         count = 0
+        queryHashChangeCount = 0
         # self.query2alive(id)
         # 有下拉页需要抓取，使用伪造的query_id配合页面的end_cursor，组建需要抓取的下一页信息
         while html.content.find("has_next_page\":true") != -1 and count < next_curosr_num:
             count += 1
             # print "next cursor:" + str(count)
-            INSTAGRAM_LOGGER.info("next cursor:" + str(count))
+            INSTAGRAM_LOGGER.info(blogger + ': next cursor:' + str(count))
             end_cursor = re.findall("\"end_cursor\": ?\"([^\"]+?)\"", html.content, re.S)[0]
             # print end_cursor
+            if not query_hash:
+                query_hash = QUERY_HASH_LIST[queryHashChangeCount]
             # next_page = "https://www.instagram.com/graphql/query/?query_id=" + str(query_id) \
             #            + "&variables=%7B%22id%22%3A%22" + id + "%22%2C%22first%22%3A12%2C%22after%22%3A%22" + end_cursor + "%22%7D"
             next_page = "https://www.instagram.com/graphql/query/?query_hash=" + str(query_hash) \
                        + "&variables=%7B%22id%22%3A%22" + id + "%22%2C%22first%22%3A12%2C%22after%22%3A%22" + end_cursor + "%22%7D"
             # print next_page
-            INSTAGRAM_LOGGER.info(next_page)
-            html = spider.getHtml(next_page, timeout=10, retries=2, proxy=True)
-            if html:
+            nextHtml = spider.getHtml(next_page, timeout=10, retries=2, proxy=True)
+            if nextHtml:
+                INSTAGRAM_LOGGER.info(blogger + ': next cursor page ' + next_page)
+                # print re.findall(prey.page_reg, nextweb.content, re.S)
+                # 先抓取shortcode，来拼接详情页面的网址 www.instagram.com/p/shortcode/?taken-by=xxx
+                short_code_list = re.findall('\"shortcode\": ?\"([^\"]+?)\", ?\"', html.content, re.S)
+                # print short_code_list
+                detail_html_list = []
+                for shortcode in short_code_list:
+                    detail_html_list.append(
+                        "https://www.instagram.com/p/" + shortcode + '/?taken-by=' + blogger)
+                # print detail_html_list
+                # print len(detail_html_list)
+
+                for detail_html in detail_html_list:
+                    detail_html_content = spider.getHtml(detail_html, timeout=10, retries=2, proxy=True)
+                    # print detail_html_content.content
+
+                    if detail_html_content:
+                        INSTAGRAM_LOGGER.info(blogger + ': detail page ' + detail_html)
+                        if 'video_url' in detail_html_content.content:
+                            videos = re.findall('\"video_url+\": ?\"([^\"]+?)\", ?\"',
+                                                detail_html_content.content, re.S)
+                            # print videos
+                            INSTAGRAM_LOGGER.info(blogger + ': video(s) ' + ' '.join(videos))
+                            if videos:
+                                # dir = prey.page.split('/')[-1]
+                                # path = "video" + os.path.sep + dir
+                                # self.mkdir(path)
+                                # if copy_new == 1:
+                                #     newpath = "video" + os.path.sep + "new" + os.path.sep + dir
+                                #     self.mkdir(newpath)
+                                videos = unicode_escape(videos)
+                                save_video(video_path, videos, copy_new)
+                            else:
+                                # print 'Fail to get ' + blogger + ' \'s video on ' + detail_html
+                                INSTAGRAM_LOGGER.warn(blogger + ': Fail to get video(s) on ' + detail_html)
+
+                        img_list = re.findall(prey.page_reg, detail_html_content.content, re.S)
+                        if img_list:
+                            img_list = unicode_escape(img_list)
+                            # 只有一个的，就抓那一个；两个以上的，从第二个开始抓取，去掉重复的
+                            if len(img_list) > 1:
+                                img_list = img_list[1:]
+                            # print img_list
+                            INSTAGRAM_LOGGER.info(blogger + ': image(s) ' + ' '.join(img_list))
+
+                            # dir = prey.page.split('/')[-1]
+                            # path = "img" + os.path.sep + dir
+                            # self.mkdir(path)
+                            # if copy_new == 1:
+                            #     newpath = "img" + os.path.sep + "new" + os.path.sep + dir
+                            #     self.mkdir(newpath)
+
+                            save_img(img_path, img_list, copy_new)
+                        else:
+                            # print 'Fail to get ' + blogger + ' \'s images on ' + detail_html
+                            INSTAGRAM_LOGGER.warn(blogger + ': Fail to get image(s) on ' + detail_html)
+
+                    else:
+                        # print 'Fail to get ' + blogger + ' \'s detail web:' + detail_html
+                        INSTAGRAM_LOGGER.warn(blogger + ': Fail to get detail web ' + detail_html)
+
+                        # result = re.findall("\"display_url\": ?\"([^\"]+?)\", ?\"", html.content, re.S)
+                        # if result:
+                        #     dir = prey.page.split('/')[-1]
+                        #     path = "img" + os.path.sep + dir
+                        #     self.mkdir(path)
+                        #     if copy_new == 1:
+                        #         newpath = "img" + os.path.sep + "new" + os.path.sep + dir
+                        #         self.mkdir(newpath)
+                        #     self.save_img(path, result, copy_new)
+                        # else:
+                        #     print 'Get proxy through regs failed!!'
+
+                html = nextHtml
+            else:
+                # print 'Get ' + prey.page + ' next cursor ' + str(count) + ' failed!!'
+                INSTAGRAM_LOGGER.warn(blogger + ': Fail to get ' + str(count) + ' cursor ' + next_page)
+
+                queryHashChangeCount = queryHashChangeCount + 1
+                if queryHashChangeCount == len(QUERY_HASH_LIST):
+                    # 使用完了QUERY_HASH_LIST里所有的query_hash，需要等待一定的时间，再从头使用列表里的值
+                    time.sleep(120)
+                    INSTAGRAM_LOGGER.info(blogger + ': Reuse query_hash in QUERY_HASH_LIST.')
+                    queryHashChangeCount = 0
+                    query_hash = ''
+                    count = count - 1
+                else:
+                    # 获取新的query_hash重新尝试,重置翻页计数，并统计更换quert_hash的次数，并在更换次数达到QUERY_HASH_LIST长度后，等待一定时间，重新从列表拿取query_hash尝试
+                    INSTAGRAM_LOGGER.info(blogger + ': Refresh query_hash by ' + str(queryHashChangeCount) + ' time.')
+                    query_hash = ''
+                    count = count - 1
+    else:
+        # print 'Get ' + prey.page + ' failed!!'
+        INSTAGRAM_LOGGER.warn(blogger + ': Fail to get ' + prey.page)
+
+
+def spider_one_instagram_blogger_full(prey, copy_new=True):
+    spider = ipProxySpider()
+    blogger = prey.page.split('/')[-1]
+    html = spider.getHtml(prey.page, timeout=10, retries=2, proxy=False)
+    # self.batch_fetch_web()
+    if html:
+        INSTAGRAM_LOGGER.info(blogger + ': main page ' + prey.page)
+        # print html.content
+        # re.S匹配换行符 可以多行匹配
+        # 先抓取shortcode，来拼接详情页面的网址 www.instagram.com/p/shortcode/?taken-by=xxx
+        short_code_list = re.findall('\"shortcode\": ?\"([^\"]+?)\", ?\"', html.content, re.S)
+        # print short_code_list
+        detail_html_list = []
+
+        dir = blogger
+        video_path = "video" + os.path.sep + dir
+        mkdir(video_path)
+        img_path = "img" + os.path.sep + dir
+        mkdir(img_path)
+        if copy_new:
+            new_img_path = "img" + os.path.sep + "new" + os.path.sep + dir
+            mkdir(new_img_path)
+            new_video_path = "video" + os.path.sep + "new" + os.path.sep + dir
+            mkdir(new_video_path)
+
+        for shortcode in short_code_list:
+            detail_html_list.append("https://www.instagram.com/p/" + shortcode + '/?taken-by=' + blogger)
+        # print detail_html_list
+        for detail_html in detail_html_list:
+            detail_html_content = spider.getHtml(detail_html, timeout=10, retries=2, proxy=False)
+            # print detail_html_content.content
+            if detail_html_content:
+                INSTAGRAM_LOGGER.info(blogger + ': detail page ' + detail_html)
+                if 'video_url' in detail_html_content.content:
+                    videos = re.findall('\"video_url+\": ?\"([^\"]+?)\", ?\"',
+                                        detail_html_content.content, re.S)
+                    # remove_tag(videos)
+                    INSTAGRAM_LOGGER.info(blogger + ': video(s) ' + ' '.join(videos))
+                    if videos:
+                        videos = unicode_escape(videos)
+                        save_video(video_path, videos, copy_new)
+                    else:
+                        INSTAGRAM_LOGGER.warn(blogger + ': Fail to get video(s) on ' + detail_html)
+
+                img_list = re.findall(prey.page_reg, detail_html_content.content, re.S)
+                # remove_tag(img_list)
+                if img_list:
+                    img_list = unicode_escape(img_list)
+                    # 只有一个的，就抓那一个；两个以上的，从第二个开始抓取，去掉重复的
+                    if len(img_list) > 1:
+                        img_list = img_list[1:]
+                    INSTAGRAM_LOGGER.info(blogger + ': image(s) ' + ' '.join(img_list))
+
+                    save_img(img_path, img_list, copy_new)
+                else:
+
+                    INSTAGRAM_LOGGER.warn(blogger + ': Fail to get image(s) on ' + detail_html)
+            else:
+                INSTAGRAM_LOGGER.warn(blogger + ': Fail to get detail web ' + detail_html)
+
+        # 获取第一页的帖子数
+        pageInfoCount = len(short_code_list)
+        # 获取这个ins总共有多个帖子
+        pageInfoNum = int(
+            re.findall('\"edge_owner_to_timeline_media\":{\"count\": ?([^\"]+?), ?\"', html.content, re.S)[0])
+        INSTAGRAM_LOGGER.info(blogger + ": Get " + str(pageInfoCount) + ' out of ' + str(pageInfoNum) + ' .')
+
+        id = re.findall("\"id\": ?\"(\d+)\", ?\"username", html.content, re.S)[0]
+        # print id
+        # query_id = 17862015703145017
+        query_hash = ''
+        count = 0
+        queryHashChangeCount = 0
+        # self.query2alive(id)
+        # 有下拉页需要抓取，使用伪造的query_id配合页面的end_cursor，组建需要抓取的下一页信息，同时在获取的帖子数大于等于总共有的帖子数的时候停止
+        while html.content.find("has_next_page\":true") != -1 and pageInfoCount < pageInfoNum:
+            count += 1
+            # print "next cursor:" + str(count)
+            INSTAGRAM_LOGGER.info(blogger + ": next cursor:" + str(count))
+            end_cursor = re.findall("\"end_cursor\": ?\"([^\"]+?)\"", html.content, re.S)[0]
+            #query_hash为空的话，从QUERY_HASH_LIST的指定位置获取query_hash
+            if not query_hash:
+                query_hash = QUERY_HASH_LIST[queryHashChangeCount]
+            # print end_cursor
+            # next_page = "https://www.instagram.com/graphql/query/?query_id=" + str(query_id) \
+            #            + "&variables=%7B%22id%22%3A%22" + id + "%22%2C%22first%22%3A12%2C%22after%22%3A%22" + end_cursor + "%22%7D"
+            next_page = "https://www.instagram.com/graphql/query/?query_hash=" + str(query_hash) \
+                        + "&variables=%7B%22id%22%3A%22" + id + "%22%2C%22first%22%3A12%2C%22after%22%3A%22" + end_cursor + "%22%7D"
+            # print next_page
+            nextHtml = spider.getHtml(next_page, timeout=10, retries=2, proxy=True)
+            if nextHtml:
+                INSTAGRAM_LOGGER.info(blogger + ': next cursor page ' + next_page)
                 # print re.findall(prey.page_reg, nextweb.content, re.S)
                 # 先抓取shortcode，来拼接详情页面的网址 www.instagram.com/p/shortcode/?taken-by=xxx
                 short_code_list = re.findall('\"shortcode\": ?\"([^\"]+?)\", ?\"', html.content, re.S)
@@ -155,11 +359,12 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
                     # print detail_html_content.content
 
                     if detail_html_content:
+                        INSTAGRAM_LOGGER.info(blogger + ': detail page ' + detail_html)
                         if 'video_url' in detail_html_content.content:
                             videos = re.findall('\"video_url+\": ?\"([^\"]+?)\", ?\"',
                                                 detail_html_content.content, re.S)
                             # print videos
-                            INSTAGRAM_LOGGER.info(videos)
+                            INSTAGRAM_LOGGER.info(blogger + ': video(s) ' + ' '.join(videos))
                             if videos:
                                 # dir = prey.page.split('/')[-1]
                                 # path = "video" + os.path.sep + dir
@@ -167,18 +372,20 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
                                 # if copy_new == 1:
                                 #     newpath = "video" + os.path.sep + "new" + os.path.sep + dir
                                 #     self.mkdir(newpath)
+                                videos = unicode_escape(videos)
                                 save_video(video_path, videos, copy_new)
                             else:
                                 # print 'Fail to get ' + blogger + ' \'s video on ' + detail_html
-                                INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s video on ' + detail_html)
+                                INSTAGRAM_LOGGER.warn(blogger + ': Fail to get video(s) on ' + detail_html)
 
                         img_list = re.findall(prey.page_reg, detail_html_content.content, re.S)
                         if img_list:
+                            img_list = unicode_escape(img_list)
                             # 只有一个的，就抓那一个；两个以上的，从第二个开始抓取，去掉重复的
                             if len(img_list) > 1:
                                 img_list = img_list[1:]
                             # print img_list
-                            INSTAGRAM_LOGGER.info(img_list)
+                            INSTAGRAM_LOGGER.info(blogger + ': image(s) ' + ' '.join(img_list))
 
                             # dir = prey.page.split('/')[-1]
                             # path = "img" + os.path.sep + dir
@@ -190,11 +397,11 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
                             save_img(img_path, img_list, copy_new)
                         else:
                             # print 'Fail to get ' + blogger + ' \'s images on ' + detail_html
-                            INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s images on ' + detail_html)
+                            INSTAGRAM_LOGGER.warn(blogger + ': Fail to get image(s) on ' + detail_html)
 
                     else:
                         # print 'Fail to get ' + blogger + ' \'s detail web:' + detail_html
-                        INSTAGRAM_LOGGER.warn('Fail to get ' + blogger + ' \'s detail web:' + detail_html)
+                        INSTAGRAM_LOGGER.warn(blogger + ': Fail to get detail web ' + detail_html)
 
                         # result = re.findall("\"display_url\": ?\"([^\"]+?)\", ?\"", html.content, re.S)
                         # if result:
@@ -207,14 +414,31 @@ def spider_one_instagram_blogger(prey, next_curosr_num, copy_new):
                         #     self.save_img(path, result, copy_new)
                         # else:
                         #     print 'Get proxy through regs failed!!'
+
+                pageInfoCount = pageInfoCount + len(short_code_list)
+                INSTAGRAM_LOGGER.info(blogger + ": Get " + str(pageInfoCount) + ' out of ' + str(pageInfoNum) + ' .')
+                html = nextHtml
             else:
                 # print 'Get ' + prey.page + ' next cursor ' + str(count) + ' failed!!'
-                INSTAGRAM_LOGGER.warn('Get ' + prey.page + ' next cursor ' + str(count) + ' failed!!')
-                break
+                INSTAGRAM_LOGGER.warn(blogger + ': Fail to get ' + str(count) + ' cursor ' + next_page)
+
+                queryHashChangeCount = queryHashChangeCount + 1
+                if queryHashChangeCount == len(QUERY_HASH_LIST):
+                    #使用完了QUERY_HASH_LIST里所有的query_hash，需要等待一定的时间，再从头使用列表里的值
+                    time.sleep(120)
+                    INSTAGRAM_LOGGER.info(blogger + ': Reuse query_hash in QUERY_HASH_LIST.')
+                    queryHashChangeCount = 0
+                    query_hash = ''
+                    count = count - 1
+                else:
+                    #获取新的query_hash重新尝试,重置翻页计数，并统计更换quert_hash的次数，并在更换次数达到QUERY_HASH_LIST长度后，等待一定时间，重新从列表拿取query_hash尝试
+                    INSTAGRAM_LOGGER.info(blogger + ': Refresh query_hash by ' + str(queryHashChangeCount) + ' time.')
+                    query_hash = ''
+                    count = count - 1
 
     else:
         # print 'Get ' + prey.page + ' failed!!'
-        INSTAGRAM_LOGGER.warn('Get ' + prey.page + ' failed!!')
+        INSTAGRAM_LOGGER.warn(blogger + ': Fail to get ' + prey.page)
 
 def save_img(path, result, copy_new=True):
     spider = ipProxySpider()
@@ -247,10 +471,10 @@ def save_img(path, result, copy_new=True):
                         f.close()
                     down_load_count += 1
                     # print item + ' downloads successfully.'
-                    INSTAGRAM_LOGGER.info(path.split(os.path.sep)[-1] + ' \'s ' + item + ' downloads successfully.')
+                    INSTAGRAM_LOGGER.info(path.split(os.path.sep)[-1] + ': successfully downloads ' + item)
                 else:
                     # print item + " downloads failed."
-                    INSTAGRAM_LOGGER.warn(path.split(os.path.sep)[-1] + ' \'s ' + item + " downloads failed.")
+                    INSTAGRAM_LOGGER.warn(path.split(os.path.sep)[-1] + ': fail to downloads ' + item)
 
         # if down_load_count == total and down_load_count > 0:
         #     print "save all pics of this page."
@@ -289,10 +513,10 @@ def save_video(path, videos, copy_new=0):
                             f.write(video.content)
                     down_load_count += 1
                     # print item + ' downloads successfully.'
-                    INSTAGRAM_LOGGER.info(path.split(os.path.sep)[-1] + ' \'s ' + item + ' downloads successfully.')
+                    INSTAGRAM_LOGGER.info(path.split(os.path.sep)[-1] + ': successfully downloads ' + item)
                 else:
                     # print item + " downloads failed."
-                    INSTAGRAM_LOGGER.warn(path.split(os.path.sep)[-1] + ' \'s ' + item + " downloads failed.")
+                    INSTAGRAM_LOGGER.warn(path.split(os.path.sep)[-1] + ': fail to downloads ' + item)
 
         # if down_load_count == total and down_load_count > 0:
         #     print "save all videos of this page."
@@ -318,6 +542,19 @@ def spider_mutilecpu(next_curosr_num, copy_new = 1):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         for prey in preylist:
             executor.submit(spider_one_instagram_blogger, prey, next_curosr_num, copy_new)
+
+def remove_tag(string_list):
+    tag = '\u0026_nc_cat='
+    for index, str in enumerate(string_list):
+        # print(str.split(tag)[0])
+        string_list[index] = str.split(tag)[0]
+    # print string_list
+
+def unicode_escape(strList):
+    result = []
+    for str in strList:
+        result.append(str.decode('unicode_escape'))
+    return result
 
 # def batch_fetch_web(self):
 #     posthtml = "https://www.instagram.com/qp/batch_fetch_web"
@@ -481,17 +718,32 @@ class SpiderPrey(object):
 
 if __name__ == "__main__":
     # prey_list = []
-    # prey = SpiderPrey()
-    # page = "https://www.instagram.com/joca"#hannahbjeter
-    # reg = "\"display_[a-z]+\": *\"([^\"]+?)\", *\""
-    # prey.catalogue = "null"
-    # prey.catalogue_reg = "null"
-    # prey.page = page
-    # prey.next_page = "null"
-    # prey.page_reg = reg
-    # prey_list.append(prey)
+    # for blogger in ['mavrin', 'mavrin_film', 'mavrin_models', 'mavrinland', 'mavrinmag', 'mavrinstudios', 'maximmag_kr', 'mmodels_agency', '007natalee', 'n.lee007', 'natalee.007', 'olgademar']:
+    #     prey = SpiderPrey()
+    #     page = "https://www.instagram.com/" + blogger#  mavrin_film mavrin_models mavrinland mavrinmag mavrinstudios maximmag_kr mmodels_agency 007natalee n.lee007 natalee.007 olgademar
+    #     reg = "\"display_[a-z]+\": *\"([^\"]+?)\", *\""
+    #     prey.catalogue = "null"
+    #     prey.catalogue_reg = "null"
+    #     prey.page = page
+    #     prey.next_page = "null"
+    #     prey.page_reg = reg
+    #     prey_list.append(prey)
 
     prey_list = get_prey_list()
+
+    # #用来截取，从某一个网页（包含该网页）之后的页面数据
+    # start = 0
+    # for prey in prey_list:
+    #     if prey.page == 'https://www.instagram.com/kiligkira11':
+    #         break
+    #     start += 1
+    # prey_list = prey_list[start:]
+
+    #按照获取的list，爬取数字指定的页码的数据
     spider_mutile_cpu(prey_list, 0, True)
+    # 按照获取的list，爬取网页的全部数据
+    #use_mutile_cpu(prey_list, spider_one_instagram_blogger_full)
+    #只爬一个ins的全部数据
+    #spider_one_instagram_blogger_full(prey_list[0])
 
 
