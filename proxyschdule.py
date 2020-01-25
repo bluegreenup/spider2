@@ -4,7 +4,8 @@ import re
 import random
 import time
 #import urllib2
-#import MySQLdb
+import MySQLdb
+import sys
 
 #from gevent import monkey
 #monkey.patch_all()
@@ -14,99 +15,111 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-logging.basicConfig(level=logging.INFO,
-                    format='[%(levelname)s] %(asctime)s %(filename)s[line:%(lineno)d] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    )
+LOG_FORMAT = '[%(levelname)s] %(asctime)s [name:%(name)s] [%(filename)s line:%(lineno)d] [func:%(funcName)s] %(message)s'
+DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+#basicConfig会默认创建一个StreamHandler，并且这个handler不能在后续单独修改设置。basic里面的设置是对整个logging的设置，后续的其他logging会继承设置
+# logging.basicConfig(level=logging.INFO,
+#                     format=LOG_FORMAT,
+#                     datefmt=DATE_FORMAT,
+#                     stream=sys.stdout,
+#                     )
+ROOTLOOGER = logging.getLogger()
+ROOTLOOGER.setLevel(logging.INFO)
 
 proxyschduleLog = logging.getLogger(__name__)
-proxyschduleRthandler = RotatingFileHandler('./log/info.log', maxBytes=100 * 1024 * 1024, backupCount=10)
-proxyschduleRthandler.setLevel(logging.INFO)
-proxyschduleRotatingFileHandlerFormat = logging.Formatter(
-    '[%(levelname)s] %(asctime)s %(filename)s[line:%(lineno)d] %(message)s')
-proxyschduleRthandler.setFormatter(proxyschduleRotatingFileHandlerFormat)
-proxyschduleLog.addHandler(proxyschduleRthandler)
+PROXYSCHEDULE_STREAM_HANDLER = logging.StreamHandler(sys.stdout)
+PROXYSCHEDULE_STREAM_HANDLER.setLevel(logging.INFO)
+PROXYSCHEDULE_STREAM_HANDLER.setFormatter(logging.Formatter(LOG_FORMAT))
+proxyschduleLog.addHandler(PROXYSCHEDULE_STREAM_HANDLER)
+PROXYSCHEDULE_ROTATING_FILE_HANDLER = RotatingFileHandler('./log/info.log', maxBytes=100 * 1024 * 1024, backupCount=10)
+PROXYSCHEDULE_ROTATING_FILE_HANDLER.setLevel(logging.INFO)
+PROXYSCHEDULE_ROTATING_FILE_HANDLER_FORMAT = logging.Formatter(LOG_FORMAT)
+PROXYSCHEDULE_ROTATING_FILE_HANDLER.setFormatter(PROXYSCHEDULE_ROTATING_FILE_HANDLER_FORMAT)
+proxyschduleLog.addHandler(PROXYSCHEDULE_ROTATING_FILE_HANDLER)
 
 
 class proxyschdule:
     def __init__(self):
         self.iplist = []
         self._host = "localhost"
+        # self._host = "qiyein.mysql"
         self._port = 11002
-        self._user = "xxx"
-        self._passwd = "xxx"
+        # self._port = 3306
+        self._user = "garbage"
+        self._passwd = "garbage"
         self._db = "test"
         self._table = "IpProxy"
         self._charset = "gbk"
         self._timeout = 15
 
-        # self.refreshIpList()
+        self.refreshIpList()
 
     def getIpList(self):
-        #return self.iplist
-        return ['127.0.0.1:9666']
+        return self.iplist
 
     """删除数据库中无效的代理ip"""
     def deleteProxy(self,proxy):
-        #proxy = 'xxx:xxx'
-        try:
-            conn = MySQLdb.connect(host=self._host, port=self._port, user=self._user, passwd=self._passwd, db=self._db,
-                                   charset=self._charset,
-                                   connect_timeout=self._timeout)
-            cursor = conn.cursor()
-
-            sql = """
-            delete from %s where proxy = '%s';
-            """ % (self._table, proxy)
-
-            proxyschduleLog.info("operation sql: %s" % sql)
-            cursor.execute(sql)
-            proxyschduleLog.info("affected row num: %d" % cursor.rowcount)
-
-            if cursor.rowcount != 0:
-                commitFlag = 1
-                conn.commit()
-
-            commitFlag = 0
-            cursor.close()
-            conn.close()
-
-        except:
-            proxyschduleLog.error(
-                'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.')
-            alarm = 'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.'
-            # os.system('bash ./rsyncSmsAlarm.sh ' + alarm)
-            if commitFlag == 1:
-                conn.rollback()
+        # #proxy = 'xxx:xxx'
+        # try:
+        #     conn = MySQLdb.connect(host=self._host, port=self._port, user=self._user, passwd=self._passwd, db=self._db,
+        #                            charset=self._charset,
+        #                            connect_timeout=self._timeout)
+        #     cursor = conn.cursor()
+        #
+        #     sql = """
+        #     delete from %s where proxy = '%s';
+        #     """ % (self._table, proxy)
+        #
+        #     proxyschduleLog.info("operation sql: %s" % sql)
+        #     cursor.execute(sql)
+        #     proxyschduleLog.info("affected row num: %d" % cursor.rowcount)
+        #
+        #     if cursor.rowcount != 0:
+        #         commitFlag = 1
+        #         conn.commit()
+        #
+        #     commitFlag = 0
+        #     cursor.close()
+        #     conn.close()
+        #
+        # except:
+        #     proxyschduleLog.error(
+        #         'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.')
+        #     alarm = 'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.'
+        #     # os.system('bash ./rsyncSmsAlarm.sh ' + alarm)
+        #     if commitFlag == 1:
+        #         conn.rollback()
+        pass
 
 
     """从数据库获取代理ip"""
     def refreshIpList(self):
-        self.iplist = []
-        try:
-            conn = MySQLdb.connect(host=self._host, port=self._port, user=self._user, passwd=self._passwd, db=self._db,
-                                   charset=self._charset,
-                                   connect_timeout=self._timeout)
-            cursor = conn.cursor()
-
-            sql = """select * from %s limit 300;""" % (self._table)
-
-            proxyschduleLog.info("operation sql: %s" % sql)
-            cursor.execute(sql)
-            data = cursor.fetchall()
-            cursor.close()
-            conn.close()
-
-        except:
-            proxyschduleLog.error(
-                'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.')
-            alarm = 'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.'
-            # os.system('bash ./rsyncSmsAlarm.sh ' + alarm)
-            self.iplist = []
-            return
-
-        for row in data:
-            self.iplist.append(row[0])
+        # self.iplist = []
+        # try:
+        #     conn = MySQLdb.connect(host=self._host, port=self._port, user=self._user, passwd=self._passwd, db=self._db,
+        #                            charset=self._charset,
+        #                            connect_timeout=self._timeout)
+        #     cursor = conn.cursor()
+        #
+        #     sql = """select * from %s limit 300;""" % (self._table)
+        #
+        #     proxyschduleLog.info("operation sql: %s" % sql)
+        #     cursor.execute(sql)
+        #     data = cursor.fetchall()
+        #     cursor.close()
+        #     conn.close()
+        #
+        # except:
+        #     proxyschduleLog.error(
+        #         'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.')
+        #     alarm = 'sql operation in ' + self._host + ' ' + self._db + '.' + self._table + ' has error in proxyschdule.'
+        #     # os.system('bash ./rsyncSmsAlarm.sh ' + alarm)
+        #     self.iplist = []
+        #     return
+        #
+        # for row in data:
+        #     self.iplist.append(row[0])
+        self.iplist.append('127.0.0.1:9666')
 
 
 
@@ -122,9 +135,9 @@ class proxyschdule:
     def refreshIpList(self):
         self.iplist = []
         try:
-            html = requests.get("http://22:9527/proxies")
+            html = requests.get("http://10.160.128.96:9527/proxies")
             ips = re.findall(r'(.*?)\n', html.text, re.S)
-            #request = urllib2.Request("http://126:22/proxies")
+            #request = urllib2.Request("http://10.160.128.96:9527/proxies")
             #response = urllib2.urlopen(request)
             #html = response.read().decode('utf-8')
             #ips = re.findall(r'(.*?)\n', html, re.S)

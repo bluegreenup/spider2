@@ -8,21 +8,30 @@ import time
 #import execjs
 from proxyschdule import proxyschdule
 import logging
-# import sys
+import sys
 from logging.handlers import RotatingFileHandler
 
-logging.basicConfig(level=logging.INFO,
-                    format='[%(levelname)s] %(asctime)s %(filename)s[line:%(lineno)d] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    )
+LOG_FORMAT = '[%(levelname)s] %(asctime)s [name:%(name)s] [%(filename)s line:%(lineno)d] [func:%(funcName)s] %(message)s'
+DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+#basicConfig会默认创建一个StreamHandler，并且这个handler不能在后续单独修改设置。basic里面的设置是对整个logging的设置，后续的其他logging会继承设置
+# logging.basicConfig(level=logging.INFO,
+#                     format=LOG_FORMAT,
+#                     datefmt=DATE_FORMAT,
+#                     stream=sys.stdout,
+#                     )
+ROOTLOOGER = logging.getLogger()
+ROOTLOOGER.setLevel(logging.INFO)
 
 ipProxySpiderLog = logging.getLogger(__name__)
-ipProxySpiderRthandler = RotatingFileHandler('./log/info.log', maxBytes=100 * 1024 * 1024, backupCount=10)
-ipProxySpiderRthandler.setLevel(logging.INFO)
-ipProxySpiderRotatingFileHandlerFormat = logging.Formatter(
-    '[%(levelname)s] %(asctime)s %(filename)s[line:%(lineno)d] %(message)s')
-ipProxySpiderRthandler.setFormatter(ipProxySpiderRotatingFileHandlerFormat)
-ipProxySpiderLog.addHandler(ipProxySpiderRthandler)
+IPPROXYSPIDER_STREAM_HANDLER = logging.StreamHandler(sys.stdout)
+IPPROXYSPIDER_STREAM_HANDLER.setLevel(logging.INFO)
+IPPROXYSPIDER_STREAM_HANDLER.setFormatter(logging.Formatter(LOG_FORMAT))
+ipProxySpiderLog.addHandler(IPPROXYSPIDER_STREAM_HANDLER)
+IPPROXYSPIDER_ROTATING_FILE_HANDLER = RotatingFileHandler('./log/info.log', maxBytes=100 * 1024 * 1024, backupCount=10)
+IPPROXYSPIDER_ROTATING_FILE_HANDLER.setLevel(logging.INFO)
+IPPROXYSPIDER_ROTATING_FILE_HANDLER_FORMAT = logging.Formatter(LOG_FORMAT)
+IPPROXYSPIDER_ROTATING_FILE_HANDLER.setFormatter(IPPROXYSPIDER_ROTATING_FILE_HANDLER_FORMAT)
+ipProxySpiderLog.addHandler(IPPROXYSPIDER_ROTATING_FILE_HANDLER)
 
 class ipProxySpider:
     def __init__(self):
@@ -104,14 +113,14 @@ class ipProxySpider:
                 #print response.content
                 if response.status_code >= 500:
                     ipProxySpiderLog.warn('web spider gets return code :'+str(response.status_code))
-                    # if url.find('kuaidaili.com') != -1:
-                    #     self.cookie = self.kuaidailiJS(response)
-                    #     if self.cookie != {}:
-                    #         ipProxySpiderLog.info('get cookie from kuaidaili successfully.')
-                    #         response = requests.get(url, headers=self.header, timeout=timeout,cookies=self.cookie)
-                    #     else:
-                    #         ipProxySpiderLog.error('get cookie from kuaidaili failed!')
-                    #         return None
+                    if url.find('kuaidaili.com') != -1:
+                        self.cookie = self.kuaidailiJS(response)
+                        if self.cookie != {}:
+                            ipProxySpiderLog.info('get cookie from kuaidaili successfully.')
+                            response = requests.get(url, headers=self.header, timeout=timeout,cookies=self.cookie)
+                        else:
+                            ipProxySpiderLog.error('get cookie from kuaidaili failed!')
+                            return None
 
                     if url.find('66ip.cn') != -1:
                         # self.cookie = self.kuaidailiJS(response)
@@ -163,7 +172,7 @@ class ipProxySpider:
                     self.httpproxy = httpproxy
                 else:
                     ipProxySpiderLog.warn('proxy ip list is empty,try to refresh it.')
-                    #self.spiderproxy.refreshIpList()
+                    self.spiderproxy.refreshIpList()
                     self.proxylist = self.spiderproxy.getIpList()
                     if self.proxylist:
                         ip = ''.join(str(random.choice(self.proxylist)).strip())
@@ -188,22 +197,22 @@ class ipProxySpider:
                 response = requests.get(url, headers=header, proxies=httpproxy, timeout=timeout)
                 if response.status_code >= 500:
                     ipProxySpiderLog.warn('web spider gets return code :'+str(response.status_code))
-                    # if url.find('kuaidaili.com') != -1:
-                    #     self.cookie = self.kuaidailiJS(response)
-                    #     if self.cookie != {}:
-                    #         ipProxySpiderLog.info('get cookie from kuaidaili successfully.')
-                    #         response = requests.get(url, headers=header, proxies=httpproxy, timeout=timeout,cookies=self.cookie)
-                    #         #print response
-                    #     else:
-                    #         ipProxySpiderLog.error('get cookie from kuaidaili failed!')
-                    #         return None
+                    if url.find('kuaidaili.com') != -1:
+                        self.cookie = self.kuaidailiJS(response)
+                        if self.cookie != {}:
+                            ipProxySpiderLog.info('get cookie from kuaidaili successfully.')
+                            response = requests.get(url, headers=header, proxies=httpproxy, timeout=timeout,cookies=self.cookie)
+                            #print response
+                        else:
+                            ipProxySpiderLog.error('get cookie from kuaidaili failed!')
+                            return None
 
                 # 由于400返回表明无法获取网页，但是并不会进入except段，因此需要在获得400后再次尝试
                 if response.status_code >= 400:
                     if httpproxy['http'] in self.proxylist:
                         ipProxySpiderLog.info('remove useless proxy: ' + httpproxy['http'] + ' from proxy list.')
                         self.proxylist.remove(httpproxy['http'])
-                        #self.spiderproxy.deleteProxy(httpproxy['http'])
+                        self.spiderproxy.deleteProxy(httpproxy['http'])
                     else:
                         ipProxySpiderLog.warn(httpproxy['http'] + ' is not in the proxy list.')
 
@@ -222,16 +231,14 @@ class ipProxySpider:
                         # print u'停止使用代理ip抓取'
                         ipProxySpiderLog.info('stop using proxy ip to spider.')
                         # time.sleep(self.getRandomInt(5,10))
-                        # 使用代理的环境下抓举，使用本地ip一定无法抓取，顾不用本地的ip进行多余的尝试
-                        # return self.getHtml(url, retries=self.getRandomInt(3, 7), proxy=False)
+                        return self.getHtml(url, retries=self.getRandomInt(3, 7), proxy=False)
 
                 return response
             except :
                 if httpproxy['http'] in self.proxylist:
-                    # print('except')
                     ipProxySpiderLog.info('remove useless proxy: ' + httpproxy['http'] + ' from proxy list.')
                     self.proxylist.remove(httpproxy['http'])
-                    #self.spiderproxy.deleteProxy(httpproxy['http'])
+                    self.spiderproxy.deleteProxy(httpproxy['http'])
                 else:
                     ipProxySpiderLog.warn(httpproxy['http'] + ' is not in the proxy list.')
                 # time.sleep(self.getRandomInt(5, 10))
@@ -251,40 +258,39 @@ class ipProxySpider:
                     #print u'停止使用代理ip抓取'
                     ipProxySpiderLog.info('stop using proxy ip to spider.')
                     # time.sleep(self.getRandomInt(5,10))
-                    # 使用代理的环境下抓举，使用本地ip一定无法抓取，顾不用本地的ip进行多余的尝试
-                    # return self.getHtml(url, retries=self.getRandomInt(3, 7), proxy=False)
+                    return self.getHtml(url, retries=self.getRandomInt(3,7),proxy=False)
 
         return None
 
     def getRandomInt(self,start=10,end=20):
         return random.randint(start, end)
 
-    # def kuaidailiJS(self,response):
-    #     #print 'js'
-    #     ipProxySpiderLog.info('web is kuaidaili,try to get cookie.')
-    #     first_html = response.content.decode('utf-8')
-    #     #print first_html
-    #     js_string = ''.join(re.findall(r'(function .*?)</script>', first_html))
-    #
-    #     # 提取其中执行JS函数的参数
-    #     js_func_arg = re.findall(r'setTimeout\(\"\D+\((\d+)\)\"', first_html)[0]
-    #     js_func_name = re.findall(r'function (\w+)', js_string)[0]
-    #
-    #     # 修改JS函数，使其返回Cookie内容
-    #     js_string = js_string.replace('eval("qo=eval;qo(po);")', 'return po')
-    #
-    #     func = execjs.compile(js_string)
-    #
-    #     cookie_str = func.call(js_func_name, js_func_arg)
-    #
-    #     #print cookie_str
-    #
-    #     clearance = cookie_str.replace("document.cookie='", "").split(';')[0]
-    #     #dicttype cookie
-    #     cookie =  {clearance.split('=')[0]: clearance.split('=')[1]}
-    #
-    #     print cookie
-    #     return cookie
+    def kuaidailiJS(self,response):
+        #print 'js'
+        ipProxySpiderLog.info('web is kuaidaili,try to get cookie.')
+        first_html = response.content.decode('utf-8')
+        #print first_html
+        js_string = ''.join(re.findall(r'(function .*?)</script>', first_html))
+
+        # 提取其中执行JS函数的参数
+        js_func_arg = re.findall(r'setTimeout\(\"\D+\((\d+)\)\"', first_html)[0]
+        js_func_name = re.findall(r'function (\w+)', js_string)[0]
+
+        # 修改JS函数，使其返回Cookie内容
+        js_string = js_string.replace('eval("qo=eval;qo(po);")', 'return po')
+
+        func = execjs.compile(js_string)
+
+        cookie_str = func.call(js_func_name, js_func_arg)
+
+        #print cookie_str
+
+        clearance = cookie_str.replace("document.cookie='", "").split(';')[0]
+        #dicttype cookie
+        cookie =  {clearance.split('=')[0]: clearance.split('=')[1]}
+
+        print cookie
+        return cookie
 
     def getCookie(self):
         cookie = self.cookie
