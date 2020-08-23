@@ -58,7 +58,7 @@ class ipProxySpider:
         ]
         self.spiderproxy = proxyschdule()
         self.proxylist = self.spiderproxy.getIpList()
-        self.header = {}
+        self.header = self.headersPrepare('')
         self.httpproxy = {}
         self.cookie = {}
 
@@ -71,7 +71,7 @@ class ipProxySpider:
             "User-Agent": useragent,
             # "Host": url,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            #"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+            #"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
             "Accept-Language": "zh-CN,zh;q=0.8",
             "Accept-Encoding": "gzip, deflate, br",
             # "Referer": url,
@@ -300,9 +300,11 @@ class ipProxySpider:
 
 if __name__ == '__main__':
     test = ipProxySpider()
-
-    html = test.getHtml("http://www.baidu.com", timeout=10, retries=1, proxy=True)
+    cookie = {'csrftoken': '1', 'urlgen': '"{222: 222}:555"'}
+    #html = test.getHtml("https://www.instagram.com/kingjames", timeout=10, retries=1, proxy=True)
+    html = test.get_html_with_cookie("https://www.instagram.com/p/B-kVcE6KKBN/?taken-by=anechkaannn", cookie=cookie)
     if html:
         print html.text
+        print {c.name: c.value for c in html.cookies}
     else:
         print 'failed!!'
