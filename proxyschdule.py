@@ -4,7 +4,7 @@ import re
 import random
 import time
 #import urllib2
-import MySQLdb
+#import MySQLdb
 import sys
 
 #from gevent import monkey
