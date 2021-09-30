@@ -5,6 +5,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
+import selenium
 
 import json
 import requests
@@ -85,50 +86,6 @@ def use_mutile_cpu(func, preylist):
             executor.submit(func, prey)
 
 
-#手动输入用户名和密码，并在登录后保存cookies
-def sina_login():
-    driver = webdriver.Chrome()
-    driver.get("https://www.pixwox.com/profile/kingjames/")
-    driver.maximize_window()
-    # driver.close()
-
-    # #等待登录按钮可以点击后，开始输入用户名和密码
-    # WebDriverWait(driver, 10, 0.5).until(expected_conditions.element_to_be_clickable((By.XPATH, '//a[@action-type="btn_submit"]')))
-    # element = driver.find_element_by_xpath('//input[@id="loginname"]')
-    # username = raw_input('输入用户名：')
-    # element.send_keys(username)
-    #
-    # element = driver.find_element_by_xpath('//input[@type="password"]')
-    # password = raw_input('输入密码：')
-    # element.send_keys(password)
-    #
-    # element = driver.find_element_by_xpath('//a[@action-type="btn_submit"]')
-    # element.click()
-    #
-    # WebDriverWait(driver, 10, 0.5).until(
-    #     expected_conditions.element_to_be_clickable((By.XPATH, '//input[@node-type="searchInput"]')))
-    # #保存登录后的cookie
-    # cookies = driver.get_cookies()
-    # with open("conf/sinacookies.txt", "w") as fp:
-    #     json.dump(cookies, fp)
-    return driver
-
-
-def sina_login_with_cookie():
-    driver = webdriver.Chrome()
-    driver.get("https://weibo.com/")
-    driver.maximize_window()
-    WebDriverWait(driver, 10, 0.5).until(
-        expected_conditions.element_to_be_clickable((By.XPATH, '//a[@action-type="btn_submit"]')))
-    driver.delete_all_cookies()
-    with open("conf/sinacookies.txt", "r") as fp:
-        cookies = json.load(fp)
-        for cookie in cookies:
-            driver.add_cookie(cookie)
-    driver.get("http://photo.weibo.com/")
-    return driver
-
-
 def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
     blogger = prey.page.split('/')[-1]
     url = 'https://www.pixwox.com/profile/' + blogger
@@ -174,9 +131,9 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
         videos = []
         imgs = []
         for down in download_list:
-            if '_n.jpg?_nc' in down:
+            if '_n.jpg?' in down:
                 imgs.append(down)
-            if '_n.mp4?_nc' in down:
+            if '_n.mp4?' in down:
                 videos.append(down)
 
         # print(videos)
@@ -294,11 +251,23 @@ def spider_one_imgkoa_blogger_full(prey):
 
     IMGKOA_SELENIUM_LOGGER.info(blogger + ': main page ' + url)
 
-    driver = webdriver.Chrome()
-    driver.get(url)
+    try:
+        driver = webdriver.Chrome()
+    except selenium.common.exceptions.SessionNotCreatedException:
+        IMGKOA_SELENIUM_LOGGER.warn('Chromedriver needs to be updated!!')
+        return
+
+    while(True):
+        try:
+            driver.get(url)
+            break
+        except selenium.common.exceptions.TimeoutException:
+            IMGKOA_SELENIUM_LOGGER.warn(blogger + ': Get main page timeout!! Try again.')
+            driver.quit()
+            driver = webdriver.Chrome()
     # driver.maximize_window()
     # 等cloudfare校验浏览器
-    time.sleep(8)
+    time.sleep(5)
 
     source = driver.page_source
 
@@ -333,9 +302,9 @@ def spider_one_imgkoa_blogger_full(prey):
         videos = []
         imgs = []
         for down in download_list:
-            if '_n.jpg?_nc' in down:
+            if '_n.jpg?' in down:
                 imgs.append(down)
-            if '_n.mp4?_nc' in down:
+            if '_n.mp4?' in down:
                 videos.append(down)
 
         # print(videos)
@@ -662,16 +631,17 @@ if __name__ == '__main__':
     #     prey_list.append(prey)
 
     prey_list = get_prey_list()
-    prey_list = prey_list[280:310]
+    print len(prey_list)
+    prey_list = prey_list[550:600]
     # prey_list = prey_list[-1:]
 
-    # 用来截取，从某一个blogger（包含该blogger）之后的页面数据
-    # start = 0
-    # for prey in prey_list:
-    #     if prey.page == 'https://www.instagram.com/rosiehw':
-    #         break
-    #     start += 1
-    # prey_list = prey_list[start:]
+    # 用来截取，从某一个blogger之后的页面数据
+    start = 0
+    for prey in prey_list:
+        if prey.page == 'https://www.instagram.com/novichenko.evgeniya':
+            break
+        start += 1
+    prey_list = prey_list[start:]
 
     # 用多进程，爬取获取的list的指定页码的数据
     #spider_mutile_cpu(spider_one_imgkoa_blogger, prey_list, 3)
@@ -686,7 +656,7 @@ if __name__ == '__main__':
     # for prey in prey_list:
     #     spider_one_imgkoa_blogger(prey, 3)
 
-    # 用普通方式爬取的list全部数据
+    # 顺序爬取的list全部数据
     for prey in prey_list:
         spider_one_imgkoa_blogger_full(prey)
 
