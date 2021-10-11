@@ -39,7 +39,7 @@ IMGKOA_SELENIUM_ROTATING_FILE_HANDLER.setFormatter(logging.Formatter(LOG_FORMAT)
 IMGKOA_SELENIUM_LOGGER.addHandler(IMGKOA_SELENIUM_ROTATING_FILE_HANDLER)
 
 COOKIE = False
-SAVETOFILE = True
+SAVETOFILE = False
 
 
 def get_prey_list():
@@ -92,16 +92,31 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
 
     IMGKOA_SELENIUM_LOGGER.info(blogger + ': main page ' + url)
 
-    driver = webdriver.Chrome()
-    driver.get(url)
+    try:
+        driver = webdriver.Chrome()
+    except selenium.common.exceptions.SessionNotCreatedException:
+        IMGKOA_SELENIUM_LOGGER.warn('Chromedriver needs to be updated!!')
+        return
+
+    while (True):
+        try:
+            driver.get(url)
+            break
+        except selenium.common.exceptions.TimeoutException:
+            IMGKOA_SELENIUM_LOGGER.warn(blogger + ': Get main page timeout!! Try again.')
     # driver.maximize_window()
     # 等cloudfare校验浏览器
     time.sleep(8)
 
     source = driver.page_source
 
-    short_code_list = re.findall('<a href="/post/([^/\{]+?)/" *class="cover_link">', source, re.S)
+    short_code_list = re.findall('<a href="/[^0-9]+/([^/\{]+?)/" *class="cover_link" *target="_blank">', source, re.S)
     # print(short_code_list)
+    if not short_code_list:
+        IMGKOA_SELENIUM_LOGGER.warn(
+            blogger + ": Get main page short code list failed!!!Owner may change the web.")
+        driver.quit()
+        return
 
     video_path = "video" + os.path.sep + blogger
     mkdir(video_path)
@@ -114,7 +129,12 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
     driver.switch_to.window(tabs[1])
 
     for shortcode in short_code_list:
-        driver.get("https://www.pixwox.com/post/" + shortcode)
+        while (True):
+            try:
+                driver.get("https://www.pixwox.com/post/" + shortcode)
+                break
+            except selenium.common.exceptions.TimeoutException:
+                IMGKOA_SELENIUM_LOGGER.warn(blogger + ": Get https://www.pixwox.com/post/" + shortcode + ' timeout!! Try again.')
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': detail page ' + "https://www.pixwox.com/post/" + shortcode)
 
         tab_source = driver.page_source
@@ -178,6 +198,13 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
 
         piclist = re.findall('down_pic":"([^"]+?)"', driver.page_source, re.S)
         videolist = re.findall('down_video":"([^"]+?)"', driver.page_source, re.S)
+
+        # pic一定有，如果获取不到说明页面改变，video未必有，暂不包含video获取不到的逻辑
+        # if not piclist:
+        #     IMGKOA_SELENIUM_LOGGER.warn(
+        #         blogger + ": Get next cursor piclist failed!!!Owner may change the web.")
+        #     driver.quit()
+        #     return
 
         piclist = list(set(piclist))
         videolist = list(set(videolist))
@@ -263,16 +290,20 @@ def spider_one_imgkoa_blogger_full(prey):
             break
         except selenium.common.exceptions.TimeoutException:
             IMGKOA_SELENIUM_LOGGER.warn(blogger + ': Get main page timeout!! Try again.')
-            driver.quit()
-            driver = webdriver.Chrome()
     # driver.maximize_window()
     # 等cloudfare校验浏览器
     time.sleep(5)
 
     source = driver.page_source
+    # print(source)
 
-    short_code_list = re.findall('<a href="/post/([^/\{]+?)/" *class="cover_link">', source, re.S)
+    short_code_list = re.findall('<a href="/[^0-9]+/([^/\{]+?)/" *class="cover_link" *target="_blank">', source, re.S)
     # print(short_code_list)
+    if not short_code_list:
+        IMGKOA_SELENIUM_LOGGER.warn(
+            blogger + ": Get main page short code list failed!!!Owner may change the web.")
+        driver.quit()
+        return
 
     video_path = "video" + os.path.sep + blogger
     mkdir(video_path)
@@ -285,7 +316,12 @@ def spider_one_imgkoa_blogger_full(prey):
     driver.switch_to.window(tabs[1])
 
     for shortcode in short_code_list:
-        driver.get("https://www.pixwox.com/post/" + shortcode)
+        while (True):
+            try:
+                driver.get("https://www.pixwox.com/post/" + shortcode)
+                break
+            except selenium.common.exceptions.TimeoutException:
+                IMGKOA_SELENIUM_LOGGER.warn(blogger + ": Get https://www.pixwox.com/post/" + shortcode + ' timeout!! Try again.')
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': detail page ' + "https://www.pixwox.com/post/" + shortcode)
 
         tab_source = driver.page_source
@@ -355,6 +391,13 @@ def spider_one_imgkoa_blogger_full(prey):
 
         piclist = re.findall('down_pic":"([^"]+?)"', driver.page_source, re.S)
         videolist = re.findall('down_video":"([^"]+?)"', driver.page_source, re.S)
+
+        # pic一定有，如果获取不到说明页面改变，video未必有，暂不包含video获取不到的逻辑
+        # if not piclist:
+        #     IMGKOA_SELENIUM_LOGGER.warn(
+        #         blogger + ": Get next cursor piclist failed!!!Owner may change the web.")
+        #     driver.quit()
+        #     return
 
         piclist = list(set(piclist))
         videolist = list(set(videolist))
@@ -616,6 +659,9 @@ if __name__ == '__main__':
     web = "https://www.pixwox.com/zh-hant/"
     # 'https://www.imgkoa.com/zh-hant/'
 
+    COOKIE = False
+    SAVETOFILE = True
+
     prey_list = []
 
     # 自行测试用
@@ -632,16 +678,16 @@ if __name__ == '__main__':
 
     prey_list = get_prey_list()
     print len(prey_list)
-    prey_list = prey_list[550:600]
+    prey_list = prey_list[-1:]
     # prey_list = prey_list[-1:]
 
     # 用来截取，从某一个blogger之后的页面数据
-    start = 0
-    for prey in prey_list:
-        if prey.page == 'https://www.instagram.com/novichenko.evgeniya':
-            break
-        start += 1
-    prey_list = prey_list[start:]
+    # start = 0
+    # for prey in prey_list:
+    #     if prey.page == 'https://www.instagram.com/dinonoz':
+    #         break
+    #     start += 1
+    # prey_list = prey_list[start:]
 
     # 用多进程，爬取获取的list的指定页码的数据
     #spider_mutile_cpu(spider_one_imgkoa_blogger, prey_list, 3)
