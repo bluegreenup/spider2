@@ -422,7 +422,7 @@
 <html>
 <catalogue>null</catalogue>
 <cataloguereg>null</cataloguereg>
-<page>https://www.instagram.com/samantha_saint</page>
+<page>https://www.instagram.com/officialsamanthasaint</page>
 <nextpage>null</nextpage>
 <pagereg>"display_[a-z]+\": ?\"([^\"]+?)\", ?\"</pagereg>
 </html>
@@ -4423,7 +4423,6 @@
 <nextpage>null</nextpage>
 <pagereg>"display_[a-z]+\": ?\"([^\"]+?)\", ?\"</pagereg>
 </html>
-    #全爬分界
     <html>
 <catalogue>null</catalogue>
 <cataloguereg>null</cataloguereg>
@@ -4592,4 +4591,26 @@
 <nextpage>null</nextpage>
 <pagereg>"display_[a-z]+\": ?\"([^\"]+?)\", ?\"</pagereg>
 </html>
+    <html>
+<catalogue>null</catalogue>
+<cataloguereg>null</cataloguereg>
+<page>https://www.instagram.com/roxeuoon</page>
+<nextpage>null</nextpage>
+<pagereg>"display_[a-z]+\": ?\"([^\"]+?)\", ?\"</pagereg>
+</html>
+    <html>
+<catalogue>null</catalogue>
+<cataloguereg>null</cataloguereg>
+<page>https://www.instagram.com/wagner.anna.lisa</page>
+<nextpage>null</nextpage>
+<pagereg>"display_[a-z]+\": ?\"([^\"]+?)\", ?\"</pagereg>
+</html>
+    <html>
+<catalogue>null</catalogue>
+<cataloguereg>null</cataloguereg>
+<page>https://www.instagram.com/gabbyepstein</page>
+<nextpage>null</nextpage>
+<pagereg>"display_[a-z]+\": ?\"([^\"]+?)\", ?\"</pagereg>
+</html>
+    #全爬分界
 </collection>
