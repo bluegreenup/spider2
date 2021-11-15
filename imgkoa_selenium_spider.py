@@ -33,7 +33,7 @@ IMGKOA_SELENIUM_STREAM_HANDLER = logging.StreamHandler(sys.stdout)
 IMGKOA_SELENIUM_STREAM_HANDLER.setLevel(logging.WARN)
 IMGKOA_SELENIUM_STREAM_HANDLER.setFormatter(logging.Formatter(LOG_FORMAT))
 IMGKOA_SELENIUM_LOGGER.addHandler(IMGKOA_SELENIUM_STREAM_HANDLER)
-IMGKOA_SELENIUM_ROTATING_FILE_HANDLER = RotatingFileHandler('./log/info.log', maxBytes=100 * 1024 * 1024, backupCount=10)
+IMGKOA_SELENIUM_ROTATING_FILE_HANDLER = RotatingFileHandler('./log/info.log', maxBytes=100 * 1024 * 1024, backupCount=50)
 IMGKOA_SELENIUM_ROTATING_FILE_HANDLER.setLevel(logging.INFO)
 IMGKOA_SELENIUM_ROTATING_FILE_HANDLER.setFormatter(logging.Formatter(LOG_FORMAT))
 IMGKOA_SELENIUM_LOGGER.addHandler(IMGKOA_SELENIUM_ROTATING_FILE_HANDLER)
@@ -94,17 +94,20 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
 
     try:
         driver = webdriver.Chrome()
+        driver.minimize_window()
     except selenium.common.exceptions.SessionNotCreatedException:
         IMGKOA_SELENIUM_LOGGER.warn('Chromedriver needs to be updated!!')
         return
 
+    # driver.maximize_window()
     while (True):
         try:
             driver.get(url)
+            driver.minimize_window()
             break
         except selenium.common.exceptions.TimeoutException:
             IMGKOA_SELENIUM_LOGGER.warn(blogger + ': Get main page timeout!! Try again.')
-    # driver.maximize_window()
+
     # 等cloudfare校验浏览器
     time.sleep(8)
 
@@ -114,7 +117,7 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
     # print(short_code_list)
     if not short_code_list:
         IMGKOA_SELENIUM_LOGGER.warn(
-            blogger + ": Get main page short code list failed!!!Owner may change the web.")
+            blogger + ": Get main page short code list failed!!!Webmanager may change the web or owner may close the account.")
         driver.quit()
         return
 
@@ -125,17 +128,20 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
 
     new_window = 'window.open()'
     driver.execute_script(new_window)
+    driver.minimize_window()
     tabs = driver.window_handles
     driver.switch_to.window(tabs[1])
+    driver.minimize_window()
 
     for shortcode in short_code_list:
         while (True):
             try:
-                driver.get("https://www.pixwox.com/post/" + shortcode)
+                driver.get("https://www.pixwox.com/zh-hant/post/" + shortcode)
+                driver.minimize_window()
                 break
             except selenium.common.exceptions.TimeoutException:
-                IMGKOA_SELENIUM_LOGGER.warn(blogger + ": Get https://www.pixwox.com/post/" + shortcode + ' timeout!! Try again.')
-        IMGKOA_SELENIUM_LOGGER.info(blogger + ': detail page ' + "https://www.pixwox.com/post/" + shortcode)
+                IMGKOA_SELENIUM_LOGGER.warn(blogger + ": Get https://www.pixwox.com/zh-hant/post/" + shortcode + ' timeout!! Try again.')
+        IMGKOA_SELENIUM_LOGGER.info(blogger + ': detail page ' + "https://www.pixwox.com/zh-hant/post/" + shortcode)
 
         tab_source = driver.page_source
         # print(tab_source)
@@ -167,6 +173,7 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
             save_img(img_path, imgs)
 
     driver.switch_to.window(tabs[0])
+    driver.minimize_window()
 
     userid = re.findall('<input type="hidden" name="userid" value="([^"]+?)">', source, re.S)[0]
     data_next = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="([^"]+?)">', source, re.S)
@@ -193,6 +200,7 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': next cursor page ' + nextcursor)
 
         driver.get(nextcursor)
+        driver.minimize_window()
         # print(driver.page_source)
         time.sleep(2)
 
@@ -280,6 +288,7 @@ def spider_one_imgkoa_blogger_full(prey):
 
     try:
         driver = webdriver.Chrome()
+        driver.minimize_window()
     except selenium.common.exceptions.SessionNotCreatedException:
         IMGKOA_SELENIUM_LOGGER.warn('Chromedriver needs to be updated!!')
         return
@@ -287,10 +296,11 @@ def spider_one_imgkoa_blogger_full(prey):
     while(True):
         try:
             driver.get(url)
+            driver.minimize_window()
             break
         except selenium.common.exceptions.TimeoutException:
             IMGKOA_SELENIUM_LOGGER.warn(blogger + ': Get main page timeout!! Try again.')
-    # driver.maximize_window()
+
     # 等cloudfare校验浏览器
     time.sleep(5)
 
@@ -301,7 +311,7 @@ def spider_one_imgkoa_blogger_full(prey):
     # print(short_code_list)
     if not short_code_list:
         IMGKOA_SELENIUM_LOGGER.warn(
-            blogger + ": Get main page short code list failed!!!Owner may change the web.")
+            blogger + ": Get main page short code list failed!!!Webmanager may change the web or owner may close the account.")
         driver.quit()
         return
 
@@ -312,17 +322,20 @@ def spider_one_imgkoa_blogger_full(prey):
 
     new_window = 'window.open()'
     driver.execute_script(new_window)
+    driver.minimize_window()
     tabs = driver.window_handles
     driver.switch_to.window(tabs[1])
+    driver.minimize_window()
 
     for shortcode in short_code_list:
         while (True):
             try:
-                driver.get("https://www.pixwox.com/post/" + shortcode)
+                driver.get("https://www.pixwox.com/zh-hant/post/" + shortcode)
+                driver.minimize_window()
                 break
             except selenium.common.exceptions.TimeoutException:
-                IMGKOA_SELENIUM_LOGGER.warn(blogger + ": Get https://www.pixwox.com/post/" + shortcode + ' timeout!! Try again.')
-        IMGKOA_SELENIUM_LOGGER.info(blogger + ': detail page ' + "https://www.pixwox.com/post/" + shortcode)
+                IMGKOA_SELENIUM_LOGGER.warn(blogger + ": Get https://www.pixwox.com/zh-hant/post/" + shortcode + ' timeout!! Try again.')
+        IMGKOA_SELENIUM_LOGGER.info(blogger + ': detail page ' + "https://www.pixwox.com/zh-hant/post/" + shortcode)
 
         tab_source = driver.page_source
         # print(tab_source)
@@ -354,6 +367,7 @@ def spider_one_imgkoa_blogger_full(prey):
             save_img(img_path, imgs)
 
     driver.switch_to.window(tabs[0])
+    driver.minimize_window()
 
     userid = re.findall('<input type="hidden" name="userid" value="([^"]+?)">', source, re.S)
     data_next = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="([^"]+?)">', source, re.S)
@@ -386,6 +400,7 @@ def spider_one_imgkoa_blogger_full(prey):
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': next cursor page ' + nextcursor)
 
         driver.get(nextcursor)
+        driver.minimize_window()
         # print(driver.page_source)
         time.sleep(2)
 
@@ -676,18 +691,21 @@ if __name__ == '__main__':
     #     prey.page_reg = reg
     #     prey_list.append(prey)
 
+    # 获取待爬取列表，如有需要做一下切分
     prey_list = get_prey_list()
-    print len(prey_list)
-    prey_list = prey_list[-1:]
+    print ("Len: " + str(len(prey_list)))
+    lasttime = 0
+    prey_list = prey_list[lasttime:200]
     # prey_list = prey_list[-1:]
 
     # 用来截取，从某一个blogger之后的页面数据
     # start = 0
     # for prey in prey_list:
-    #     if prey.page == 'https://www.instagram.com/dinonoz':
+    #     if prey.page == 'https://www.instagram.com/erinmichellexo':
     #         break
     #     start += 1
     # prey_list = prey_list[start:]
+    # lasttime = start
 
     # 用多进程，爬取获取的list的指定页码的数据
     #spider_mutile_cpu(spider_one_imgkoa_blogger, prey_list, 3)
@@ -700,12 +718,12 @@ if __name__ == '__main__':
 
     # 用普通方式爬取获取的list的指定页数的数据
     # for prey in prey_list:
+    #     print("===== " + str(lasttime) + ' ===== ' + prey.page.split('/')[-1])
     #     spider_one_imgkoa_blogger(prey, 3)
+    #     lasttime = lasttime + 1
 
     # 顺序爬取的list全部数据
     for prey in prey_list:
+        print("===== " + str(lasttime) + ' ===== ' + prey.page.split('/')[-1])
         spider_one_imgkoa_blogger_full(prey)
-
-    # 2021.1.8 最后全爬
-
-    # 2021.9.8 开始重新下载
+        lasttime = lasttime + 1
