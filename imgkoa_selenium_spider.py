@@ -39,7 +39,7 @@ IMGKOA_SELENIUM_ROTATING_FILE_HANDLER.setFormatter(logging.Formatter(LOG_FORMAT)
 IMGKOA_SELENIUM_LOGGER.addHandler(IMGKOA_SELENIUM_ROTATING_FILE_HANDLER)
 
 COOKIE = False
-SAVETOFILE = False
+SAVETOFILE = True
 
 
 def get_prey_list():
@@ -157,7 +157,7 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
         videos = []
         imgs = []
         for down in download_list:
-            if '_n.jpg?' in down:
+            if '_n.jpg?' in down or '_n.webp?' in down:
                 imgs.append(down)
             if '_n.mp4?' in down:
                 videos.append(down)
@@ -176,14 +176,28 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
     driver.minimize_window()
 
     userid = re.findall('<input type="hidden" name="userid" value="([^"]+?)">', source, re.S)[0]
-    data_next = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="([^"]+?)">', source, re.S)
+    data_next = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="([^"]+?)"', source, re.S)
+    data_maxid = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="[^"]*" data-maxid="([^"]+?)"',
+                            source, re.S)
     # print(userid)
     # print(data_next)
+    if userid:
+        userid = userid[0]
+    else:
+        IMGKOA_SELENIUM_LOGGER.warn(blogger + ': No user id.')
 
     if data_next:
         data_next = data_next[0]
     else:
-        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No next cursor.')
+        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No data-next.')
+
+    if data_maxid:
+        data_maxid = data_maxid[0]
+    else:
+        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No data-maxid.')
+
+    if not data_next and not data_maxid:
+        IMGKOA_SELENIUM_LOGGER.warn(blogger + ': No next info in main page.')
         driver.quit()
         return
 
@@ -196,7 +210,10 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
         count += 1
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': next cursor:' + str(count))
 
-        nextcursor = 'https://api.pixwox.com/posts?userid=' + userid + '&next=' + data_next
+        if data_next:
+            nextcursor = 'https://www.pixwox.com/api/posts?userid=' + userid + '&next=' + data_next
+        elif data_maxid:
+            nextcursor = 'https://www.pixwox.com/api/posts?userid=' + userid + '&next=&maxid=' + data_maxid
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': next cursor page ' + nextcursor)
 
         driver.get(nextcursor)
@@ -271,7 +288,12 @@ def spider_one_imgkoa_blogger(prey, next_curosr_num=0):
             lastimgfulldownload = False
 
         if 'has_next":true' in driver.page_source:
-            data_next = re.findall('next":"([^"]+?)"', driver.page_source, re.S)[0]
+            data_next = re.findall('"next":"([^"]+?)"', driver.page_source, re.S)
+            if data_next:
+                data_next = data_next[0]
+            data_maxid = re.findall('"maxid":"([^"]+?)"', driver.page_source, re.S)
+            if data_maxid:
+                data_maxid = data_maxid[0]
             # print(data_next)
         elif 'has_next":false' in driver.page_source:
             IMGKOA_SELENIUM_LOGGER.info(blogger + ': End of next cursor.' + nextcursor)
@@ -285,6 +307,14 @@ def spider_one_imgkoa_blogger_full(prey):
     url = 'https://www.pixwox.com/profile/' + blogger
 
     IMGKOA_SELENIUM_LOGGER.info(blogger + ': main page ' + url)
+
+    prey_list = get_prey_list()
+    preynum = 0
+    for item in prey_list:
+        if item.page == prey.page:
+            break
+        preynum += 1
+    # print("===== " + str(preynum) + ' ===== ' + blogger + ': start spider.')
 
     try:
         driver = webdriver.Chrome()
@@ -351,7 +381,7 @@ def spider_one_imgkoa_blogger_full(prey):
         videos = []
         imgs = []
         for down in download_list:
-            if '_n.jpg?' in down:
+            if '_n.jpg?' in down or '_n.webp?' in down:
                 imgs.append(down)
             if '_n.mp4?' in down:
                 videos.append(down)
@@ -370,20 +400,28 @@ def spider_one_imgkoa_blogger_full(prey):
     driver.minimize_window()
 
     userid = re.findall('<input type="hidden" name="userid" value="([^"]+?)">', source, re.S)
-    data_next = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="([^"]+?)">', source, re.S)
+    data_next = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="([^"]+?)"', source, re.S)
+    data_maxid = re.findall('<a href="javascript:void\(0\);" class="more_btn" data-next="[^"]*" data-maxid="([^"]+?)"',
+                            source, re.S)
     # print(userid)
     # print(data_next)
     if userid:
         userid = userid[0]
     else:
-        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No user id.')
-        driver.quit()
-        return
+        IMGKOA_SELENIUM_LOGGER.warn(blogger + ': No user id.')
 
     if data_next:
         data_next = data_next[0]
     else:
-        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No next cursor.')
+        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No data-next.')
+
+    if data_maxid:
+        data_maxid = data_maxid[0]
+    else:
+        IMGKOA_SELENIUM_LOGGER.info(blogger + ': No data-maxid.')
+
+    if not data_next and not data_maxid:
+        IMGKOA_SELENIUM_LOGGER.warn(blogger + ': No next info in main page.')
         driver.quit()
         return
 
@@ -396,7 +434,11 @@ def spider_one_imgkoa_blogger_full(prey):
         count += 1
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': next cursor:' + str(count))
 
-        nextcursor = 'https://api.pixwox.com/posts?userid=' + userid + '&next=' + data_next
+        # nextcursor = 'https://api.pixwox.com/posts?userid=' + userid + '&next=' + data_next
+        if data_next:
+            nextcursor = 'https://www.pixwox.com/api/posts?userid=' + userid + '&next=' + data_next
+        elif data_maxid:
+            nextcursor = 'https://www.pixwox.com/api/posts?userid=' + userid + '&next=&maxid=' + data_maxid
         IMGKOA_SELENIUM_LOGGER.info(blogger + ': next cursor page ' + nextcursor)
 
         driver.get(nextcursor)
@@ -471,12 +513,19 @@ def spider_one_imgkoa_blogger_full(prey):
             lastimgfulldownload = False
 
         if 'has_next":true' in driver.page_source:
-            data_next = re.findall('next":"([^"]+?)"', driver.page_source, re.S)[0]
+            data_next = re.findall('"next":"([^"]+?)"', driver.page_source, re.S)
+            if data_next:
+                data_next = data_next[0]
+            data_maxid = re.findall('"maxid":"([^"]+?)"', driver.page_source, re.S)
+            if data_maxid:
+                data_maxid = data_maxid[0]
             # print(data_next)
         elif 'has_next":false' in driver.page_source:
             IMGKOA_SELENIUM_LOGGER.info(blogger + ': End of next cursor.' + nextcursor)
             break
 
+
+    print("===== " + str(preynum) + ' ===== ' + blogger + ': end spider.')
     driver.quit()
 
 
@@ -518,7 +567,7 @@ def save_img(path, result):
                     IMGKOA_SELENIUM_LOGGER.warn(path.split(os.path.sep)[-1] + ': fail to downloads ' + item)
 
         if len(result) == has_in_file:
-            IMGKOA_SELENIUM_LOGGER.info(path.split(os.path.sep)[-1] + ': has already downloaded all of the cursor\'s imgs.')
+            IMGKOA_SELENIUM_LOGGER.info(path.split(os.path.sep)[-1] + ': has all of the imgs in conf file.')
             # 返回true表示这页的数据都已经下载过了
             return True
         else:
@@ -570,7 +619,7 @@ def save_video(path, videos):
                         IMGKOA_SELENIUM_LOGGER.warn(path.split(os.path.sep)[-1] + ': fail to downloads ' + item)
 
         if len(videos) == has_in_file:
-            IMGKOA_SELENIUM_LOGGER.info(path.split(os.path.sep)[-1] + ': has already downloaded all of the cursor\'s videos.')
+            IMGKOA_SELENIUM_LOGGER.info(path.split(os.path.sep)[-1] + ': has all of the videos in conf file.')
             # 返回true表示这页的数据都已经下载过了
             return True
         else:
@@ -695,23 +744,34 @@ if __name__ == '__main__':
     prey_list = get_prey_list()
     print ("Len: " + str(len(prey_list)))
     lasttime = 0
-    prey_list = prey_list[lasttime:200]
-    # prey_list = prey_list[-1:]
+    prey_list = prey_list[lasttime:]
+    # prey_list = prey_list[-6:]
 
     # 用来截取，从某一个blogger之后的页面数据
     # start = 0
     # for prey in prey_list:
-    #     if prey.page == 'https://www.instagram.com/erinmichellexo':
+    #     if prey.page == 'https://www.instagram.com/cristyren.live':
     #         break
     #     start += 1
     # prey_list = prey_list[start:]
     # lasttime = start
 
+    # 爬取指定blogger的数据
+    # prey_list = []
+    # for blogger in ['lexakubena', 'xdoudou2']:
+    #     prey = SpiderPrey()
+    #     prey.catalogue = 'null'
+    #     prey.catalogue_reg = 'null'
+    #     prey.page = 'https://www.instagram.com/' + blogger
+    #     prey.next_page = 'null'
+    #     prey.page_reg = '"display_[a-z]+\": ?\"([^\"]+?)\", ?\"'
+    #     prey_list.append(prey)
+
     # 用多进程，爬取获取的list的指定页码的数据
     #spider_mutile_cpu(spider_one_imgkoa_blogger, prey_list, 3)
 
     # 用多进程，爬取获取的list的全部数据
-    # use_mutile_cpu(spider_one_imgkoa_blogger_full, prey_list)
+    use_mutile_cpu(spider_one_imgkoa_blogger_full, prey_list)
 
     # 只爬一个ins的全部数据
     # spider_one_imgkoa_blogger_full(prey_list[0])
@@ -723,7 +783,7 @@ if __name__ == '__main__':
     #     lasttime = lasttime + 1
 
     # 顺序爬取的list全部数据
-    for prey in prey_list:
-        print("===== " + str(lasttime) + ' ===== ' + prey.page.split('/')[-1])
-        spider_one_imgkoa_blogger_full(prey)
-        lasttime = lasttime + 1
+    # for prey in prey_list:
+    #     print("===== " + str(lasttime) + ' ===== ' + prey.page.split('/')[-1])
+    #     spider_one_imgkoa_blogger_full(prey)
+    #     lasttime = lasttime + 1
